@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from pathlib import Path
 
 st.set_page_config(
     page_title="AI Student Progress Tracker",
@@ -7,26 +8,116 @@ st.set_page_config(
     layout="wide"
 )
 
+DATA_FILE = Path("data/students.csv")
+
+
+def load_students():
+    return pd.read_csv(DATA_FILE)
+
+
+def calculate_performance(students):
+    score_columns = ["python", "sql", "projects"]
+
+    students["Average Score"] = students[score_columns].mean(axis=1)
+
+    def get_performance(score):
+        if score >= 85:
+            return "Excellent"
+        elif score >= 70:
+            return "Good"
+        return "Needs Improvement"
+
+    students["Performance"] = students["Average Score"].apply(
+        get_performance
+    )
+
+    return students
+
+
+# Load data
+students = load_students()
+students = calculate_performance(students)
+
+
+# -----------------------------
+# Page Header
+# -----------------------------
+
 st.title("📊 AI Student Progress Tracker")
 st.write("Track and analyze student learning progress.")
 
-# Load student data
-students = pd.read_csv("data/students.csv")
 
-# Calculate average score
-score_columns = ["python", "sql", "projects"]
-students["Average Score"] = students[score_columns].mean(axis=1)
+# -----------------------------
+# Add Student
+# -----------------------------
 
-# Determine performance level
-def get_performance(score):
-    if score >= 85:
-        return "Excellent"
-    elif score >= 70:
-        return "Good"
-    else:
-        return "Needs Improvement"
+st.sidebar.header("➕ Add Student")
 
-students["Performance"] = students["Average Score"].apply(get_performance)
+with st.sidebar.form("student_form"):
+
+    student_id = st.text_input("Student ID")
+    name = st.text_input("Student Name")
+    grade = st.number_input(
+        "Grade",
+        min_value=1,
+        max_value=12,
+        value=5
+    )
+
+    python_score = st.number_input(
+        "Python Score",
+        min_value=0,
+        max_value=100,
+        value=0
+    )
+
+    sql_score = st.number_input(
+        "SQL Score",
+        min_value=0,
+        max_value=100,
+        value=0
+    )
+
+    project_score = st.number_input(
+        "Project Score",
+        min_value=0,
+        max_value=100,
+        value=0
+    )
+
+    submitted = st.form_submit_button("Add Student")
+
+    if submitted:
+
+        if not student_id or not name:
+            st.sidebar.error("Student ID and Name are required.")
+
+        elif student_id in students["student_id"].values:
+            st.sidebar.error("Student ID already exists.")
+
+        else:
+            new_student = pd.DataFrame({
+                "student_id": [student_id],
+                "name": [name],
+                "grade": [grade],
+                "python": [python_score],
+                "sql": [sql_score],
+                "projects": [project_score]
+            })
+
+            new_student.to_csv(
+                DATA_FILE,
+                mode="a",
+                header=False,
+                index=False
+            )
+
+            st.sidebar.success(
+                f"{name} added successfully!"
+            )
+
+            st.rerun()
+
 
 # -----------------------------
 # Dashboard Metrics
@@ -34,8 +125,12 @@ students["Performance"] = students["Average Score"].apply(get_performance)
 
 total_students = len(students)
 overall_average = students["Average Score"].mean()
-excellent_students = (students["Performance"] == "Excellent").sum()
-needs_improvement = (students["Performance"] == "Needs Improvement").sum()
+excellent_students = (
+    students["Performance"] == "Excellent"
+).sum()
+needs_improvement = (
+    students["Performance"] == "Needs Improvement"
+).sum()
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -44,8 +139,9 @@ col2.metric("📊 Average Score", f"{overall_average:.2f}")
 col3.metric("🏆 Excellent", excellent_students)
 col4.metric("⚠️ Needs Improvement", needs_improvement)
 
+
 # -----------------------------
-# Student Performance Table
+# Student Performance
 # -----------------------------
 
 st.subheader("📈 Student Performance")
@@ -54,6 +150,7 @@ st.dataframe(
     students,
     use_container_width=True
 )
+
 
 # -----------------------------
 # Individual Student Analysis
@@ -66,9 +163,9 @@ selected_student = st.selectbox(
     students["name"]
 )
 
-student = students[students["name"] == selected_student].iloc[0]
-
-st.write(f"### 📋 {student['name']}'s Performance")
+student = students[
+    students["name"] == selected_student
+].iloc[0]
 
 col1, col2, col3 = st.columns(3)
 
@@ -84,6 +181,7 @@ st.metric(
 st.write(
     f"**Performance Level:** {student['Performance']}"
 )
+
 
 # -----------------------------
 # Performance Chart
@@ -103,6 +201,7 @@ chart_data = pd.DataFrame({
 st.bar_chart(
     chart_data.set_index("Subject")
 )
+
 
 # -----------------------------
 # Learning Recommendation
