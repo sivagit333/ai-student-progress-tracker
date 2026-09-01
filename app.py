@@ -151,6 +151,155 @@ st.dataframe(
     use_container_width=True
 )
 
+# -----------------------------
+# Student Management
+# -----------------------------
+
+st.subheader("🛠️ Student Management")
+
+management_student = st.selectbox(
+    "Select a student to manage",
+    students["student_id"],
+    format_func=lambda x: students.loc[
+        students["student_id"] == x, "name"
+    ].iloc[0],
+    key="management_student"
+)
+
+selected_data = students[
+    students["student_id"] == management_student
+].iloc[0]
+
+with st.expander("✏️ Edit Student"):
+
+    with st.form("edit_student_form"):
+
+        edit_name = st.text_input(
+            "Student Name",
+            value=selected_data["name"]
+        )
+
+        edit_grade = st.number_input(
+            "Grade",
+            min_value=1,
+            max_value=12,
+            value=int(selected_data["grade"])
+        )
+
+        edit_python = st.number_input(
+            "Python Score",
+            min_value=0,
+            max_value=100,
+            value=int(selected_data["python"])
+        )
+
+        edit_sql = st.number_input(
+            "SQL Score",
+            min_value=0,
+            max_value=100,
+            value=int(selected_data["sql"])
+        )
+
+        edit_projects = st.number_input(
+            "Project Score",
+            min_value=0,
+            max_value=100,
+            value=int(selected_data["projects"])
+        )
+
+        update_button = st.form_submit_button(
+            "💾 Update Student"
+        )
+
+        if update_button:
+
+            students.loc[
+                students["student_id"] == management_student,
+                "name"
+            ] = edit_name
+
+            students.loc[
+                students["student_id"] == management_student,
+                "grade"
+            ] = edit_grade
+
+            students.loc[
+                students["student_id"] == management_student,
+                "python"
+            ] = edit_python
+
+            students.loc[
+                students["student_id"] == management_student,
+                "sql"
+            ] = edit_sql
+
+            students.loc[
+                students["student_id"] == management_student,
+                "projects"
+            ] = edit_projects
+
+            # Save only the original columns
+            students[
+                [
+                    "student_id",
+                    "name",
+                    "grade",
+                    "python",
+                    "sql",
+                    "projects"
+                ]
+            ].to_csv(
+                DATA_FILE,
+                index=False
+            )
+
+            st.success(
+                f"{edit_name} updated successfully!"
+            )
+
+            st.rerun()
+
+
+# -----------------------------
+# Delete Student
+# -----------------------------
+
+with st.expander("🗑️ Delete Student"):
+
+    st.warning(
+        f"You are about to delete "
+        f"{selected_data['name']}."
+    )
+
+    delete_button = st.button(
+        "🗑️ Delete Student",
+        key="delete_student"
+    )
+
+    if delete_button:
+
+        students = students[
+            students["student_id"] != management_student
+        ]
+
+        students[
+            [
+                "student_id",
+                "name",
+                "grade",
+                "python",
+                "sql",
+                "projects"
+            ]
+        ].to_csv(
+            DATA_FILE,
+            index=False
+        )
+
+        st.success("Student deleted successfully!")
+
+        st.rerun()
+
 
 # -----------------------------
 # Individual Student Analysis
