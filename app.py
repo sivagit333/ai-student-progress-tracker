@@ -1,6 +1,13 @@
 import streamlit as st
 import pandas as pd
-from pathlib import Path
+import os
+from dotenv import load_dotenv
+from supabase import create_client
+
+
+# ============================================================
+# PAGE CONFIGURATION
+# ============================================================
 
 st.set_page_config(
     page_title="AI Student Progress Tracker",
@@ -8,55 +15,120 @@ st.set_page_config(
     layout="wide"
 )
 
-DATA_FILE = Path("data/students.csv")
 
+# ============================================================
+# SUPABASE CONNECTION
+# ============================================================
+
+load_dotenv()
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Supabase credentials are missing. Please check your .env file.")
+    st.stop()
+
+supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY
+)
+
+
+# ============================================================
+# LOAD STUDENTS
+# ============================================================
 
 def load_students():
-    return pd.read_csv(DATA_FILE)
 
+    response = (
+        supabase
+        .table("students")
+        .select(
+            "student_id, name, grade, python, sql, projects"
+        )
+        .execute()
+    )
+
+    return pd.DataFrame(response.data)
+
+
+# ============================================================
+# CALCULATE PERFORMANCE
+# ============================================================
 
 def calculate_performance(students):
-    score_columns = ["python", "sql", "projects"]
 
-    students["Average Score"] = students[score_columns].mean(axis=1)
+    if students.empty:
+        return students
+
+    score_columns = [
+        "python",
+        "sql",
+        "projects"
+    ]
+
+    students["Average Score"] = (
+        students[score_columns]
+        .mean(axis=1)
+    )
 
     def get_performance(score):
+
         if score >= 85:
             return "Excellent"
+
         elif score >= 70:
             return "Good"
+
         return "Needs Improvement"
 
-    students["Performance"] = students["Average Score"].apply(
-        get_performance
+    students["Performance"] = (
+        students["Average Score"]
+        .apply(get_performance)
     )
 
     return students
 
 
-# Load data
+# ============================================================
+# LOAD DATA
+# ============================================================
+
 students = load_students()
-students = calculate_performance(students)
+
+students = calculate_performance(
+    students
+)
 
 
-# -----------------------------
-# Page Header
-# -----------------------------
+# ============================================================
+# PAGE HEADER
+# ============================================================
 
 st.title("📊 AI Student Progress Tracker")
-st.write("Track and analyze student learning progress.")
+
+st.write(
+    "Track and analyze student learning progress."
+)
 
 
-# -----------------------------
-# Add Student
-# -----------------------------
+# ============================================================
+# ADD STUDENT
+# ============================================================
 
 st.sidebar.header("➕ Add Student")
 
 with st.sidebar.form("student_form"):
 
-    student_id = st.text_input("Student ID")
-    name = st.text_input("Student Name")
+    student_id = st.text_input(
+        "Student ID"
+    )
+
+    name = st.text_input(
+        "Student Name"
+    )
+
     grade = st.number_input(
         "Grade",
         min_value=1,
@@ -85,304 +157,501 @@ with st.sidebar.form("student_form"):
         value=0
     )
 
-    submitted = st.form_submit_button("Add Student")
+    submitted = st.form_submit_button(
+        "Add Student"
+    )
 
     if submitted:
 
         if not student_id or not name:
-            st.sidebar.error("Student ID and Name are required.")
 
-        elif student_id in students["student_id"].values:
-            st.sidebar.error("Student ID already exists.")
+            st.sidebar.error(
+                "Student ID and Name are required."
+            )
+
+        elif (
+            not students.empty
+            and student_id in students["student_id"].values
+        ):
+
+            st.sidebar.error(
+                "Student ID already exists."
+            )
 
         else:
-            new_student = pd.DataFrame({
-                "student_id": [student_id],
-                "name": [name],
-                "grade": [grade],
-                "python": [python_score],
-                "sql": [sql_score],
-                "projects": [project_score]
-            })
 
-            new_student.to_csv(
-                DATA_FILE,
-                mode="a",
-                header=False,
-                index=False
-            )
+            try:
 
-            st.sidebar.success(
-                f"{name} added successfully!"
-            )
+                supabase.table("students").insert({
 
-            st.rerun()
+                    "student_id": student_id,
+                    "name": name,
+                    "grade": grade,
+                    "python": python_score,
+                    "sql": sql_score,
+                    "projects": project_score
+
+                }).execute()
+
+                st.sidebar.success(
+                    f"{name} added successfully!"
+                )
+
+                st.rerun()
+
+            except Exception as e:
+
+                st.sidebar.error(
+                    f"Error adding student: {e}"
+                )
 
 
-# -----------------------------
-# Dashboard Metrics
-# -----------------------------
+# ============================================================
+# DASHBOARD METRICS
+# ============================================================
 
-total_students = len(students)
-overall_average = students["Average Score"].mean()
-excellent_students = (
-    students["Performance"] == "Excellent"
-).sum()
-needs_improvement = (
-    students["Performance"] == "Needs Improvement"
-).sum()
+if students.empty:
+
+    total_students = 0
+    overall_average = 0
+    excellent_students = 0
+    needs_improvement = 0
+
+else:
+
+    total_students = len(students)
+
+    overall_average = (
+        students["Average Score"].mean()
+    )
+
+    excellent_students = (
+        students["Performance"] == "Excellent"
+    ).sum()
+
+    needs_improvement = (
+        students["Performance"] == "Needs Improvement"
+    ).sum()
+
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("👨‍🎓 Total Students", total_students)
-col2.metric("📊 Average Score", f"{overall_average:.2f}")
-col3.metric("🏆 Excellent", excellent_students)
-col4.metric("⚠️ Needs Improvement", needs_improvement)
 
-
-# -----------------------------
-# Student Performance
-# -----------------------------
-
-st.subheader("📈 Student Performance")
-
-st.dataframe(
-    students,
-    use_container_width=True
+col1.metric(
+    "👨‍🎓 Total Students",
+    total_students
 )
 
-# -----------------------------
-# Student Management
-# -----------------------------
-
-st.subheader("🛠️ Student Management")
-
-management_student = st.selectbox(
-    "Select a student to manage",
-    students["student_id"],
-    format_func=lambda x: students.loc[
-        students["student_id"] == x, "name"
-    ].iloc[0],
-    key="management_student"
+col2.metric(
+    "📊 Average Score",
+    f"{overall_average:.2f}"
 )
 
-selected_data = students[
-    students["student_id"] == management_student
-].iloc[0]
+col3.metric(
+    "🏆 Excellent",
+    excellent_students
+)
 
-with st.expander("✏️ Edit Student"):
+col4.metric(
+    "⚠️ Needs Improvement",
+    needs_improvement
+)
 
-    with st.form("edit_student_form"):
 
-        edit_name = st.text_input(
-            "Student Name",
-            value=selected_data["name"]
-        )
+# ============================================================
+# STUDENT PERFORMANCE
+# ============================================================
 
-        edit_grade = st.number_input(
-            "Grade",
-            min_value=1,
-            max_value=12,
-            value=int(selected_data["grade"])
-        )
+st.subheader(
+    "📈 Student Performance"
+)
 
-        edit_python = st.number_input(
-            "Python Score",
-            min_value=0,
-            max_value=100,
-            value=int(selected_data["python"])
-        )
+if students.empty:
 
-        edit_sql = st.number_input(
-            "SQL Score",
-            min_value=0,
-            max_value=100,
-            value=int(selected_data["sql"])
-        )
+    st.info(
+        "No students found. Add a student using the sidebar."
+    )
 
-        edit_projects = st.number_input(
-            "Project Score",
-            min_value=0,
-            max_value=100,
-            value=int(selected_data["projects"])
-        )
+else:
 
-        update_button = st.form_submit_button(
-            "💾 Update Student"
-        )
+    st.dataframe(
+        students,
+        use_container_width=True
+    )
 
-        if update_button:
 
+# ============================================================
+# STUDENT MANAGEMENT
+# ============================================================
+
+st.subheader(
+    "🛠️ Student Management"
+)
+
+if not students.empty:
+
+    management_student = st.selectbox(
+
+        "Select a student to manage",
+
+        students["student_id"],
+
+        format_func=lambda x:
             students.loc[
-                students["student_id"] == management_student,
+                students["student_id"] == x,
                 "name"
-            ] = edit_name
+            ].iloc[0],
 
-            students.loc[
-                students["student_id"] == management_student,
-                "grade"
-            ] = edit_grade
+        key="management_student"
+    )
 
-            students.loc[
-                students["student_id"] == management_student,
-                "python"
-            ] = edit_python
 
-            students.loc[
-                students["student_id"] == management_student,
-                "sql"
-            ] = edit_sql
+    selected_data = students[
+        students["student_id"] == management_student
+    ].iloc[0]
 
-            students.loc[
-                students["student_id"] == management_student,
-                "projects"
-            ] = edit_projects
 
-            # Save only the original columns
-            students[
-                [
+    # ========================================================
+    # EDIT STUDENT
+    # ========================================================
+
+    with st.expander(
+        "✏️ Edit Student"
+    ):
+
+        with st.form(
+            "edit_student_form"
+        ):
+
+            edit_name = st.text_input(
+
+                "Student Name",
+
+                value=selected_data["name"]
+            )
+
+
+            edit_grade = st.number_input(
+
+                "Grade",
+
+                min_value=1,
+
+                max_value=12,
+
+                value=int(
+                    selected_data["grade"]
+                )
+            )
+
+
+            edit_python = st.number_input(
+
+                "Python Score",
+
+                min_value=0,
+
+                max_value=100,
+
+                value=int(
+                    selected_data["python"]
+                )
+            )
+
+
+            edit_sql = st.number_input(
+
+                "SQL Score",
+
+                min_value=0,
+
+                max_value=100,
+
+                value=int(
+                    selected_data["sql"]
+                )
+            )
+
+
+            edit_projects = st.number_input(
+
+                "Project Score",
+
+                min_value=0,
+
+                max_value=100,
+
+                value=int(
+                    selected_data["projects"]
+                )
+            )
+
+
+            update_button = st.form_submit_button(
+
+                "💾 Update Student"
+            )
+
+
+            if update_button:
+
+                try:
+
+                    supabase.table(
+                        "students"
+                    ).update({
+
+                        "name": edit_name,
+
+                        "grade": edit_grade,
+
+                        "python": edit_python,
+
+                        "sql": edit_sql,
+
+                        "projects": edit_projects
+
+                    }).eq(
+                        "student_id",
+                        management_student
+                    ).execute()
+
+
+                    st.success(
+                        f"{edit_name} updated successfully!"
+                    )
+
+                    st.rerun()
+
+
+                except Exception as e:
+
+                    st.error(
+                        f"Error updating student: {e}"
+                    )
+
+
+    # ========================================================
+    # DELETE STUDENT
+    # ========================================================
+
+    with st.expander(
+        "🗑️ Delete Student"
+    ):
+
+        st.warning(
+
+            f"You are about to delete "
+            f"{selected_data['name']}."
+        )
+
+
+        delete_button = st.button(
+
+            "🗑️ Delete Student",
+
+            key="delete_student"
+        )
+
+
+        if delete_button:
+
+            try:
+
+                supabase.table(
+                    "students"
+                ).delete().eq(
                     "student_id",
-                    "name",
-                    "grade",
-                    "python",
-                    "sql",
-                    "projects"
-                ]
-            ].to_csv(
-                DATA_FILE,
-                index=False
-            )
-
-            st.success(
-                f"{edit_name} updated successfully!"
-            )
-
-            st.rerun()
+                    management_student
+                ).execute()
 
 
-# -----------------------------
-# Delete Student
-# -----------------------------
+                st.success(
+                    "Student deleted successfully!"
+                )
 
-with st.expander("🗑️ Delete Student"):
+                st.rerun()
 
-    st.warning(
-        f"You are about to delete "
-        f"{selected_data['name']}."
+
+            except Exception as e:
+
+                st.error(
+                    f"Error deleting student: {e}"
+                )
+
+
+# ============================================================
+# INDIVIDUAL STUDENT ANALYSIS
+# ============================================================
+
+st.subheader(
+    "👤 Individual Student Analysis"
+)
+
+
+if not students.empty:
+
+    selected_student = st.selectbox(
+
+        "Select a student",
+
+        students["name"],
+
+        key="analysis_student"
     )
 
-    delete_button = st.button(
-        "🗑️ Delete Student",
-        key="delete_student"
+
+    student = students[
+        students["name"] == selected_student
+    ].iloc[0]
+
+
+    col1, col2, col3 = st.columns(3)
+
+
+    col1.metric(
+        "🐍 Python",
+        student["python"]
     )
 
-    if delete_button:
 
-        students = students[
-            students["student_id"] != management_student
+    col2.metric(
+        "🗄️ SQL",
+        student["sql"]
+    )
+
+
+    col3.metric(
+        "📁 Projects",
+        student["projects"]
+    )
+
+
+    st.metric(
+
+        "📊 Average Score",
+
+        f"{student['Average Score']:.2f}"
+    )
+
+
+    st.write(
+
+        f"**Performance Level:** "
+        f"{student['Performance']}"
+    )
+
+
+    # ========================================================
+    # PERFORMANCE CHART
+    # ========================================================
+
+    st.subheader(
+        "📊 Subject Performance"
+    )
+
+
+    chart_data = pd.DataFrame({
+
+        "Subject": [
+            "Python",
+            "SQL",
+            "Projects"
+        ],
+
+        "Score": [
+
+            student["python"],
+
+            student["sql"],
+
+            student["projects"]
+
         ]
 
-        students[
-            [
-                "student_id",
-                "name",
-                "grade",
-                "python",
-                "sql",
-                "projects"
-            ]
-        ].to_csv(
-            DATA_FILE,
-            index=False
+    })
+
+
+    st.bar_chart(
+
+        chart_data.set_index(
+            "Subject"
+        )
+    )
+
+
+    # ========================================================
+    # LEARNING RECOMMENDATION
+    # ========================================================
+
+    st.subheader(
+        "🤖 Learning Recommendation"
+    )
+
+
+    scores = {
+
+        "Python": student["python"],
+
+        "SQL": student["sql"],
+
+        "Projects": student["projects"]
+
+    }
+
+
+    weakest_subject = min(
+        scores,
+        key=scores.get
+    )
+
+
+    weakest_score = scores[
+        weakest_subject
+    ]
+
+
+    if weakest_score < 70:
+
+        recommendation = (
+
+            f"{student['name']} needs additional "
+            f"practice in {weakest_subject}. "
+            f"Consider assigning beginner-level "
+            f"exercises and reviewing the fundamentals."
+
         )
 
-        st.success("Student deleted successfully!")
 
-        st.rerun()
+    elif weakest_score < 85:
 
+        recommendation = (
 
-# -----------------------------
-# Individual Student Analysis
-# -----------------------------
+            f"{student['name']} is making good "
+            f"progress in {weakest_subject}. "
+            f"More practice could help improve "
+            f"their confidence and performance."
 
-st.subheader("👤 Individual Student Analysis")
-
-selected_student = st.selectbox(
-    "Select a student",
-    students["name"]
-)
-
-student = students[
-    students["name"] == selected_student
-].iloc[0]
-
-col1, col2, col3 = st.columns(3)
-
-col1.metric("🐍 Python", student["python"])
-col2.metric("🗄️ SQL", student["sql"])
-col3.metric("📁 Projects", student["projects"])
-
-st.metric(
-    "📊 Average Score",
-    f"{student['Average Score']:.2f}"
-)
-
-st.write(
-    f"**Performance Level:** {student['Performance']}"
-)
+        )
 
 
-# -----------------------------
-# Performance Chart
-# -----------------------------
+    else:
 
-st.subheader("📊 Subject Performance")
+        recommendation = (
 
-chart_data = pd.DataFrame({
-    "Subject": ["Python", "SQL", "Projects"],
-    "Score": [
-        student["python"],
-        student["sql"],
-        student["projects"]
-    ]
-})
+            f"{student['name']} is performing well "
+            f"across all subjects. Consider giving "
+            f"advanced {weakest_subject} challenges."
 
-st.bar_chart(
-    chart_data.set_index("Subject")
-)
+        )
 
 
-# -----------------------------
-# Learning Recommendation
-# -----------------------------
-
-st.subheader("🤖 Learning Recommendation")
-
-scores = {
-    "Python": student["python"],
-    "SQL": student["sql"],
-    "Projects": student["projects"]
-}
-
-weakest_subject = min(scores, key=scores.get)
-weakest_score = scores[weakest_subject]
-
-if weakest_score < 70:
-    recommendation = (
-        f"{student['name']} needs additional practice in "
-        f"{weakest_subject}. Consider assigning beginner-level "
-        f"exercises and reviewing the fundamentals."
+    st.info(
+        recommendation
     )
-elif weakest_score < 85:
-    recommendation = (
-        f"{student['name']} is making good progress in "
-        f"{weakest_subject}. More practice could help improve "
-        f"their confidence and performance."
-    )
+
 else:
-    recommendation = (
-        f"{student['name']} is performing well across all subjects. "
-        f"Consider giving advanced {weakest_subject} challenges."
-    )
 
-st.info(recommendation)
+    st.info(
+        "Add a student to view individual analysis."
+    )
