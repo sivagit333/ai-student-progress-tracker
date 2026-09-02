@@ -54,6 +54,44 @@ def load_students():
 
 
 # ============================================================
+# LOAD PROGRESS HISTORY
+# ============================================================
+
+def load_progress_history(student_id):
+
+    response = (
+        supabase
+        .table("progress_history")
+        .select(
+            "student_id, recorded_date, python, sql, projects"
+        )
+        .eq(
+            "student_id",
+            student_id
+        )
+        .order(
+            "recorded_date"
+        )
+        .execute()
+    )
+
+    # Always return the expected columns
+    # even when there are no records.
+    columns = [
+        "student_id",
+        "recorded_date",
+        "python",
+        "sql",
+        "projects"
+    ]
+
+    return pd.DataFrame(
+        response.data,
+        columns=columns
+    )
+
+
+# ============================================================
 # CALCULATE PERFORMANCE
 # ============================================================
 
@@ -236,7 +274,6 @@ else:
 
 col1, col2, col3, col4 = st.columns(4)
 
-
 col1.metric(
     "👨‍🎓 Total Students",
     total_students
@@ -305,7 +342,6 @@ if not students.empty:
         key="management_student"
     )
 
-
     selected_data = students[
         students["student_id"] == management_student
     ].iloc[0]
@@ -324,74 +360,49 @@ if not students.empty:
         ):
 
             edit_name = st.text_input(
-
                 "Student Name",
-
                 value=selected_data["name"]
             )
 
-
             edit_grade = st.number_input(
-
                 "Grade",
-
                 min_value=1,
-
                 max_value=12,
-
                 value=int(
                     selected_data["grade"]
                 )
             )
 
-
             edit_python = st.number_input(
-
                 "Python Score",
-
                 min_value=0,
-
                 max_value=100,
-
                 value=int(
                     selected_data["python"]
                 )
             )
 
-
             edit_sql = st.number_input(
-
                 "SQL Score",
-
                 min_value=0,
-
                 max_value=100,
-
                 value=int(
                     selected_data["sql"]
                 )
             )
 
-
             edit_projects = st.number_input(
-
                 "Project Score",
-
                 min_value=0,
-
                 max_value=100,
-
                 value=int(
                     selected_data["projects"]
                 )
             )
 
-
             update_button = st.form_submit_button(
-
                 "💾 Update Student"
             )
-
 
             if update_button:
 
@@ -416,13 +427,11 @@ if not students.empty:
                         management_student
                     ).execute()
 
-
                     st.success(
                         f"{edit_name} updated successfully!"
                     )
 
                     st.rerun()
-
 
                 except Exception as e:
 
@@ -440,19 +449,14 @@ if not students.empty:
     ):
 
         st.warning(
-
             f"You are about to delete "
             f"{selected_data['name']}."
         )
 
-
         delete_button = st.button(
-
             "🗑️ Delete Student",
-
             key="delete_student"
         )
-
 
         if delete_button:
 
@@ -465,13 +469,11 @@ if not students.empty:
                     management_student
                 ).execute()
 
-
                 st.success(
                     "Student deleted successfully!"
                 )
 
                 st.rerun()
-
 
             except Exception as e:
 
@@ -488,7 +490,6 @@ st.subheader(
     "👤 Individual Student Analysis"
 )
 
-
 if not students.empty:
 
     selected_student = st.selectbox(
@@ -500,46 +501,328 @@ if not students.empty:
         key="analysis_student"
     )
 
-
     student = students[
         students["name"] == selected_student
     ].iloc[0]
 
 
-    col1, col2, col3 = st.columns(3)
+    # ========================================================
+    # LOAD PROGRESS HISTORY
+    # ========================================================
 
+    progress_history = load_progress_history(
+        student["student_id"]
+    )
+
+
+    # ========================================================
+    # CURRENT PERFORMANCE METRICS
+    # ========================================================
+
+    col1, col2, col3 = st.columns(3)
 
     col1.metric(
         "🐍 Python",
         student["python"]
     )
 
-
     col2.metric(
         "🗄️ SQL",
         student["sql"]
     )
-
 
     col3.metric(
         "📁 Projects",
         student["projects"]
     )
 
-
     st.metric(
-
         "📊 Average Score",
-
         f"{student['Average Score']:.2f}"
     )
 
-
     st.write(
-
         f"**Performance Level:** "
         f"{student['Performance']}"
     )
+
+
+    # ========================================================
+    # RECORD PROGRESS
+    # ========================================================
+
+    st.subheader(
+        "📅 Record Progress"
+    )
+
+    if st.button(
+        "💾 Record Current Progress",
+        key="record_progress"
+    ):
+
+        try:
+
+            supabase.table(
+                "progress_history"
+            ).insert({
+
+                "student_id": student["student_id"],
+
+                "python": int(student["python"]),
+
+                "sql": int(student["sql"]),
+
+                "projects": int(student["projects"])
+
+            }).execute()
+
+            st.success(
+                f"Progress recorded successfully for "
+                f"{student['name']}!"
+            )
+
+            st.rerun()
+
+        except Exception as e:
+
+            st.error(
+                f"Error recording progress: {e}"
+            )
+
+
+    # ========================================================
+    # PROGRESS HISTORY
+    # ========================================================
+
+    st.subheader(
+        "📚 Progress History"
+    )
+
+    if progress_history.empty:
+
+        st.info(
+            "No progress history recorded yet. "
+            "Click 'Record Current Progress' to create a record."
+        )
+
+    else:
+
+        history_display = progress_history.copy()
+
+        history_display["recorded_date"] = pd.to_datetime(
+            history_display["recorded_date"]
+        ).dt.strftime("%Y-%m-%d")
+
+        history_display = history_display.rename(
+            columns={
+                "student_id": "Student ID",
+                "recorded_date": "Date",
+                "python": "Python",
+                "sql": "SQL",
+                "projects": "Projects"
+            }
+        )
+
+        st.dataframe(
+            history_display,
+            use_container_width=True
+        )
+
+
+    # ========================================================
+    # PROGRESS TREND ANALYSIS
+    # ========================================================
+
+    if not progress_history.empty:
+
+        st.subheader(
+            "📈 Progress Trend Analysis"
+        )
+
+        history_analysis = progress_history.copy()
+
+        history_analysis["recorded_date"] = pd.to_datetime(
+            history_analysis["recorded_date"]
+        )
+
+        # Calculate average score for each record
+        history_analysis["average"] = (
+            history_analysis[
+                ["python", "sql", "projects"]
+            ].mean(axis=1)
+        )
+
+        # Sort oldest to newest
+        history_analysis = history_analysis.sort_values(
+            "recorded_date"
+        )
+
+        # First and latest averages
+        first_average = (
+            history_analysis["average"].iloc[0]
+        )
+
+        latest_average = (
+            history_analysis["average"].iloc[-1]
+        )
+
+        # Overall change
+        improvement = (
+            latest_average - first_average
+        )
+
+
+        # ====================================================
+        # OVERALL PROGRESS METRICS
+        # ====================================================
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric(
+            "📌 First Average",
+            f"{first_average:.2f}"
+        )
+
+        col2.metric(
+            "📊 Latest Average",
+            f"{latest_average:.2f}"
+        )
+
+        col3.metric(
+            "🚀 Overall Change",
+            f"{improvement:+.2f}"
+        )
+
+
+        # ====================================================
+        # OVERALL PROGRESS STATUS
+        # ====================================================
+
+        if improvement > 2:
+
+            st.success(
+                f"🟢 {student['name']} is improving! "
+                f"Overall performance increased by "
+                f"{improvement:.2f} points."
+            )
+
+        elif improvement < -2:
+
+            st.error(
+                f"🔴 {student['name']}'s performance has "
+                f"declined by {abs(improvement):.2f} points."
+            )
+
+        else:
+
+            st.info(
+                f"🟡 {student['name']}'s overall performance "
+                f"is stable."
+            )
+
+
+        # ====================================================
+        # SUBJECT-WISE PROGRESS
+        # ====================================================
+
+        st.subheader(
+            "📚 Subject-wise Progress"
+        )
+
+        first_record = history_analysis.iloc[0]
+
+        latest_record = history_analysis.iloc[-1]
+
+        subject_progress = pd.DataFrame({
+
+            "Subject": [
+                "Python",
+                "SQL",
+                "Projects"
+            ],
+
+            "First Score": [
+                first_record["python"],
+                first_record["sql"],
+                first_record["projects"]
+            ],
+
+            "Latest Score": [
+                latest_record["python"],
+                latest_record["sql"],
+                latest_record["projects"]
+            ]
+        })
+
+
+        subject_progress["Change"] = (
+            subject_progress["Latest Score"]
+            - subject_progress["First Score"]
+        )
+
+
+        # Subject progress status
+        def get_subject_status(change):
+
+            if change > 2:
+                return "📈 Improving"
+
+            elif change < -2:
+                return "📉 Declining"
+
+            return "➡️ Stable"
+
+
+        subject_progress["Status"] = (
+            subject_progress["Change"]
+            .apply(get_subject_status)
+        )
+
+
+        st.dataframe(
+            subject_progress,
+            use_container_width=True,
+            hide_index=True
+        )
+
+
+        # ====================================================
+        # PROGRESS OVER TIME CHART
+        # ====================================================
+
+        st.subheader(
+            "📈 Progress Over Time"
+        )
+
+        history_chart = progress_history.copy()
+
+        history_chart["recorded_date"] = pd.to_datetime(
+            history_chart["recorded_date"]
+        )
+
+        history_chart = history_chart.sort_values(
+            "recorded_date"
+        )
+
+        history_chart = history_chart.set_index(
+            "recorded_date"
+        )[
+            [
+                "python",
+                "sql",
+                "projects"
+            ]
+        ]
+
+        history_chart.columns = [
+            "Python",
+            "SQL",
+            "Projects"
+        ]
+
+        st.line_chart(
+            history_chart
+        )
 
 
     # ========================================================
@@ -549,7 +832,6 @@ if not students.empty:
     st.subheader(
         "📊 Subject Performance"
     )
-
 
     chart_data = pd.DataFrame({
 
@@ -571,9 +853,7 @@ if not students.empty:
 
     })
 
-
     st.bar_chart(
-
         chart_data.set_index(
             "Subject"
         )
@@ -588,7 +868,6 @@ if not students.empty:
         "🤖 Learning Recommendation"
     )
 
-
     scores = {
 
         "Python": student["python"],
@@ -599,12 +878,10 @@ if not students.empty:
 
     }
 
-
     weakest_subject = min(
         scores,
         key=scores.get
     )
-
 
     weakest_score = scores[
         weakest_subject
@@ -622,7 +899,6 @@ if not students.empty:
 
         )
 
-
     elif weakest_score < 85:
 
         recommendation = (
@@ -634,7 +910,6 @@ if not students.empty:
 
         )
 
-
     else:
 
         recommendation = (
@@ -645,10 +920,10 @@ if not students.empty:
 
         )
 
-
     st.info(
         recommendation
     )
+
 
 else:
 
