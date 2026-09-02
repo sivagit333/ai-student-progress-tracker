@@ -108,4 +108,4 @@ ai-student-progress-tracker/
 
 **Sivapriya M**
 
-This project was designed and developed as a personal portfolio project to demonstrate skills in Python, Streamlit, Pandas, Supabase, SQL, data analysis, and application deployment.
+This project was designed and developed as a personal portfolio project to demonstrate skills in Python, Streamlit, Pandas, Supabase, SQL, data analysis, and application deployment.git status
