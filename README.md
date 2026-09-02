@@ -1,22 +1,7 @@
-# AI Student Progress Tracker
+## 🚀 Live Demo
 
-An AI-powered application designed to help track and analyze student learning progress.
+Try the live application:
 
-## Features
+👉 [AI Student Progress Tracker](https://ai-student-progress-tracker-lvyw6gsakhbsnbfdb4k2z8.streamlit.app/)
 
-- Student progress tracking
-- Performance analysis
-- Learning data management
-- AI-powered insights
-- Progress reports
-
-## Technology
-
-- Python
-- Artificial Intelligence
-- Machine Learning
-- Data Analysis
-
-## Project Status
-
-🚧 Currently under development.
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ai-student-progress-tracker-lvyw6gsakhbsnbfdb4k2z8.streamlit.app/)
