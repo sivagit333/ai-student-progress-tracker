@@ -10,7 +10,7 @@ The application allows instructors to manage student records, analyze academic p
 
 Try the live application:
 
-👉 [AI Student Progress Tracker](https://ai-student-progress-tracker-lvyw6gsakhbsnbfdb4k2z8.streamlit.app/)
+👉 **[AI Student Progress Tracker](https://ai-student-progress-tracker-lvyw6gsakhbsnbfdb4k2z8.streamlit.app/)**
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ai-student-progress-tracker-lvyw6gsakhbsnbfdb4k2z8.streamlit.app/)
 
@@ -20,7 +20,7 @@ Try the live application:
 
 AI Student Progress Tracker is a web-based student performance management application built with Python and Streamlit.
 
-The application allows users to manage student records, analyze academic performance, and generate learning recommendations based on students' subject-wise scores.
+The application allows instructors to manage student records, analyze academic performance, and generate learning recommendations based on students' subject-wise scores.
 
 ### Key Capabilities
 
@@ -66,7 +66,7 @@ Select a student and view:
 - Performance level
 - Subject performance chart
 
-### 🤖 Learning Recommendation
+### 🤖 Learning Recommendations
 
 The application automatically identifies the student's weakest subject and provides a learning recommendation based on their performance.
 
@@ -90,7 +90,6 @@ The application automatically identifies the student's weakest subject and provi
 
 ```text
 ai-student-progress-tracker/
-
 │
 ├── app.py
 ├── requirements.txt
@@ -104,3 +103,9 @@ ai-student-progress-tracker/
 ├── src/
 │
 └── tests/
+
+## 👩‍💻 Developed By
+
+**Sivapriya M**
+
+This project was designed and developed as a personal portfolio project to demonstrate skills in Python, Streamlit, Pandas, Supabase, SQL, data analysis, and application deployment.
